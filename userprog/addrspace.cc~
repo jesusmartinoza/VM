@@ -57,15 +57,15 @@ SwapHeader (NoffHeader *noffH)
 //	only uniprogramming, and we have a single unsegmented page table
 //
 //	"executable" is the file containing the object code to load into memory
+//	"filename" self explanatory
 //----------------------------------------------------------------------
 
-AddrSpace::AddrSpace(OpenFile *executable)
+AddrSpace::AddrSpace(OpenFile *executable, char* filename)
 {
     OpenFile *exeF;
     
     NoffHeader noffH;
     unsigned int i, size;
-    char snom[10];
 	
 
     executable->ReadAt((char *)&noffH, sizeof(noffH), 0);
@@ -92,10 +92,10 @@ AddrSpace::AddrSpace(OpenFile *executable)
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", 
 					numPages, size);
-					
-    sprintf(snom, "%s.swp",currentThread->getName());
-    fileSystem->Create(snom,0);
-    printf("Archivo de Intercambio creado %s\n",snom);
+	
+	strcat(filename, ".swp");		
+    fileSystem->Create(filename,0);
+    printf("Archivo de Intercambio creado %s\n",filename);
     
 // first, set up the translation 
     pageTable = new TranslationEntry[numPages];
@@ -112,9 +112,9 @@ AddrSpace::AddrSpace(OpenFile *executable)
 	printf("Physical Page: %d\n", pageTable[i].physicalPage);
     }
     
-    swapFile = fileSystem->Open(snom);
-    char buff[ noffH.code.size + noffH.initData.size ];
-    int worte;
+    swapFile = fileSystem->Open(filename);
+    char buff[ noffH.code.size + noffH.initData.size ]; //tam de cosas a copiar al arch
+    int write; //para escribir
     
 // zero out the entire address space, to zero the unitialized data segment 
 // and the stack segment
@@ -125,7 +125,7 @@ AddrSpace::AddrSpace(OpenFile *executable)
     if (noffH.code.size > 0) {
         DEBUG('a', "Initializing code segment, at 0x%x, size %d\n", 
 			noffH.code.virtualAddr, noffH.code.size);
-	ReadFileIntoBuffer(noffH.code.virtualAddr, executable, noffH.code.size, noffH.code.inFileAddr, buff);
+	ReadFileIntoBuffer(noffH.code.virtualAddr, executable, noffH.code.size, noffH.code.inFileAddr, buff); //dir,arch,tam,cod,destino
        //executable->ReadAt(&(machine->mainMemory[noffH.code.virtualAddr]),
 			//noffH.code.size, noffH.code.inFileAddr);
     }
@@ -136,7 +136,7 @@ AddrSpace::AddrSpace(OpenFile *executable)
         //executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),
 			//noffH.initData.size, noffH.initData.inFileAddr);
     }
-    worte = swapFile->WriteAt(buff,noffH.code.size + noffH.initData.size,0);
+    write = swapFile->WriteAt(buff,noffH.code.size + noffH.initData.size,0);
 
 }
 int AddrSpace::ReadFileIntoBuffer(int virtAddr, OpenFile* file, int size, int fileAddr, char* into)
@@ -146,7 +146,7 @@ int AddrSpace::ReadFileIntoBuffer(int virtAddr, OpenFile* file, int size, int fi
 	int readSize = 0, copied = 0;
 	int left = currentSize;
 	int location;
-	
+	//ciclo que va leyendo de la dir virtAddr sumándole lo que va hasta que y ano queda nada de los parametros pasados, devuelve el tam del archivo y el buff ahora tiene el archivo a escribir.
 	while(left>0)
 	{
 		readSize = min(PageSize, left);
@@ -224,3 +224,4 @@ void AddrSpace::RestoreState()
     machine->pageTable = pageTable;
     machine->pageTableSize = numPages;
 }
+

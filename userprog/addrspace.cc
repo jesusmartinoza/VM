@@ -57,15 +57,16 @@ SwapHeader (NoffHeader *noffH)
 //	only uniprogramming, and we have a single unsegmented page table
 //
 //	"executable" is the file containing the object code to load into memory
+//	"filename" self explanatory
 //----------------------------------------------------------------------
 
-AddrSpace::AddrSpace(OpenFile *executable)
+AddrSpace::AddrSpace(OpenFile *executable, char* filename)
 {
+	printf("file %s\n", filename);
     OpenFile *exeF;
     
     NoffHeader noffH;
     unsigned int i, size;
-    char snom[10];
 	
 
     executable->ReadAt((char *)&noffH, sizeof(noffH), 0);
@@ -92,10 +93,10 @@ AddrSpace::AddrSpace(OpenFile *executable)
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", 
 					numPages, size);
-					
-    sprintf(snom, "%s.swp",currentThread->getName());
-    fileSystem->Create(snom,0);
-    printf("Archivo de Intercambio creado %s\n",snom);
+	
+	strcat(filename, ".swp");		
+    fileSystem->Create(filename,0);
+    printf("Archivo de Intercambio creado %s\n",filename);
     
 // first, set up the translation 
     pageTable = new TranslationEntry[numPages];
@@ -112,7 +113,7 @@ AddrSpace::AddrSpace(OpenFile *executable)
 	printf("Physical Page: %d\n", pageTable[i].physicalPage);
     }
     
-    swapFile = fileSystem->Open(snom);
+    swapFile = fileSystem->Open(filename);
     char buff[ noffH.code.size + noffH.initData.size ]; //tam de cosas a copiar al arch
     int write; //para escribir
     
@@ -136,7 +137,7 @@ AddrSpace::AddrSpace(OpenFile *executable)
         //executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),
 			//noffH.initData.size, noffH.initData.inFileAddr);
     }
-    wrote = swapFile->WriteAt(buff,noffH.code.size + noffH.initData.size,0);
+    write = swapFile->WriteAt(buff,noffH.code.size + noffH.initData.size,0);
 
 }
 int AddrSpace::ReadFileIntoBuffer(int virtAddr, OpenFile* file, int size, int fileAddr, char* into)
@@ -224,3 +225,4 @@ void AddrSpace::RestoreState()
     machine->pageTable = pageTable;
     machine->pageTableSize = numPages;
 }
+
