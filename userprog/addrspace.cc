@@ -62,30 +62,37 @@ SwapHeader (NoffHeader *noffH)
 
 AddrSpace::AddrSpace(OpenFile *executable, char* filename)
 {
-	printf("file %s\n", filename);
     OpenFile *exeF;
-    
+    int swpWriteStatus;
     NoffHeader noffH;
     unsigned int i, size;
 	
-
     executable->ReadAt((char *)&noffH, sizeof(noffH), 0);
     if ((noffH.noffMagic != NOFFMAGIC) && 
 		(WordToHost(noffH.noffMagic) == NOFFMAGIC))
     	SwapHeader(&noffH);
     ASSERT(noffH.noffMagic == NOFFMAGIC);
 
-// how big is address space?
+    char buff[ noffH.code.size + noffH.initData.size ]; //tam de cosas a copiar al arch
+
+	// how big is address space?
     size = noffH.code.size + noffH.initData.size + noffH.uninitData.size 
 			+ UserStackSize;	// we need to increase the size
 						// to leave room for the stack
 		
-	
     numPages = divRoundUp(size, PageSize);
     size = numPages * PageSize;
     printf("Número de páginas: %d \n", numPages);
-	
-	
+    
+	// Crear archivo de intercambio
+    swapFile = fileSystem->Open(filename);
+	strcat(filename, ".swp");		
+    fileSystem->Create(filename,0);
+    printf("Archivo de Intercambio creado %s\n",filename);
+
+	// Escribir codigo y datos al archivo de intercambio
+	swpWriteStatus = swapFile->WriteAt(buff,noffH.code.size + noffH.initData.size,0);
+    
     ASSERT(numPages <= NumPhysPages);		// check we're not trying
 						// to run anything too big --
 						// at least until we have
@@ -93,10 +100,6 @@ AddrSpace::AddrSpace(OpenFile *executable, char* filename)
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", 
 					numPages, size);
-	
-	strcat(filename, ".swp");		
-    fileSystem->Create(filename,0);
-    printf("Archivo de Intercambio creado %s\n",filename);
     
 // first, set up the translation 
     pageTable = new TranslationEntry[numPages];
@@ -112,11 +115,6 @@ AddrSpace::AddrSpace(OpenFile *executable, char* filename)
 	printf("Virtual Page: %d ", pageTable[i].virtualPage);
 	printf("Physical Page: %d\n", pageTable[i].physicalPage);
     }
-    
-    swapFile = fileSystem->Open(filename);
-    char buff[ noffH.code.size + noffH.initData.size ]; //tam de cosas a copiar al arch
-    int write; //para escribir
-    
 // zero out the entire address space, to zero the unitialized data segment 
 // and the stack segment
     bzero(machine->mainMemory, size);
@@ -137,8 +135,6 @@ AddrSpace::AddrSpace(OpenFile *executable, char* filename)
         //executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),
 			//noffH.initData.size, noffH.initData.inFileAddr);
     }
-    write = swapFile->WriteAt(buff,noffH.code.size + noffH.initData.size,0);
-
 }
 int AddrSpace::ReadFileIntoBuffer(int virtAddr, OpenFile* file, int size, int fileAddr, char* into)
 {
